@@ -10,16 +10,6 @@ if [ "${UPGRADE_PACKAGES}" != "none" ]; then
   echo "==> Updating and upgrading packages ..."
 
   # Add third party repositories
-  sudo add-apt-repository ppa:keithw/mosh-dev -y
-  sudo add-apt-repository ppa:jonathonf/vim -y
-
-  CLOUD_SDK_SOURCE="/etc/apt/sources.list.d/google-cloud-sdk.list"
-  CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)"
-  if [ ! -f "${CLOUD_SDK_SOURCE}" ]; then
-    echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | tee -a ${CLOUD_SDK_SOURCE}
-    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-  fi
-
   sudo apt-get update
   sudo apt-get upgrade -y
 fi
@@ -42,8 +32,6 @@ sudo apt-get install -qq \
   git-crypt \
   gnupg \
   gnupg2 \
-  google-cloud-sdk \
-  google-cloud-sdk-app-engine-go \
   htop \
   hugo \
   ipcalc \
@@ -100,46 +88,25 @@ sudo apt-get install -qq \
   zsh \
   --no-install-recommends \
 
-rm -rf /var/lib/apt/lists/*
+sudo rm -rf /var/lib/apt/lists/*
 
 # install Go
 if ! [ -x "$(command -v go)" ]; then
+  echo " =>> Installing go"
   export GO_VERSION="1.14.2"
-  wget "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" 
-  tar -C /usr/local -xzf "go${GO_VERSION}.linux-amd64.tar.gz" 
+  wget "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz"
+  sudo tar -C /usr/local -xzf "go${GO_VERSION}.linux-amd64.tar.gz"
   rm -f "go${GO_VERSION}.linux-amd64.tar.gz"
   export PATH="/usr/local/go/bin:$PATH"
 fi
 
 # install 1password
-if ! [ -x "$(command -v op)" ]; then
-  export OP_VERSION="v0.5.6-003"
-  curl -sS -o 1password.zip https://cache.agilebits.com/dist/1P/op/pkg/${OP_VERSION}/op_linux_amd64_${OP_VERSION}.zip
-  unzip 1password.zip op -d /usr/local/bin
-  rm -f 1password.zip
-fi
-
-# install protobuf
-if ! [ -x "$(command -v protoc)" ]; then
-  export PROTOBUF_VERSION="3.8.0"
-  mkdir -p protobuf_install 
-  pushd protobuf_install
-  wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
-  unzip protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
-  mv bin/protoc /usr/local/bin
-  mv include/* /usr/local/include/
-  popd
-  rm -rf protobuf_install
-fi
-
-# install tools
-if ! [ -x "$(command -v jump)" ]; then
-  echo " ==> Installing jump .."
-  export JUMP_VERSION="0.23.0"
-  wget https://github.com/gsamokovarov/jump/releases/download/v${JUMP_VERSION}/jump_${JUMP_VERSION}_amd64.deb
-  sudo dpkg -i jump_${JUMP_VERSION}_amd64.deb
-  rm -f jump_${JUMP_VERSION}_amd64.deb
-fi
+#if ! [ -x "$(command -v op)" ]; then
+#  export OP_VERSION="v0.5.6-003"
+#  curl -sS -o 1password.zip https://cache.agilebits.com/dist/1P/op/pkg/${OP_VERSION}/op_linux_amd64_${OP_VERSION}.zip
+#  unzip 1password.zip op -d /usr/local/bin
+#  rm -f 1password.zip
+#fi
 
 VIM_PLUG_FILE="${HOME}/.vim/autoload/plug.vim"
 if [ ! -f "${VIM_PLUG_FILE}" ]; then
@@ -147,7 +114,7 @@ if [ ! -f "${VIM_PLUG_FILE}" ]; then
   curl -fLo ${VIM_PLUG_FILE} --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
 
   mkdir -p "${HOME}/.vim/plugged"
-  pushd "${HOME}/.vim/plugged"
+  cd "${HOME}/.vim/plugged"
   git clone "https://github.com/AndrewRadev/splitjoin.vim"
   git clone "https://github.com/ConradIrwin/vim-bracketed-paste"
   git clone "https://github.com/Raimondi/delimitMate"
@@ -175,7 +142,7 @@ if [ ! -f "${VIM_PLUG_FILE}" ]; then
   git clone "https://github.com/tpope/vim-repeat"
   git clone "https://github.com/tpope/vim-scriptease"
   git clone "https://github.com/ervandew/supertab"
-  popd
+  cd ~
 fi
 
 if [ ! -d "$(go env GOPATH)" ]; then
@@ -188,7 +155,7 @@ if [ ! -d "$(go env GOPATH)" ]; then
   go get -u -v golang.org/x/tools/cmd/goimports
   go get -u -v golang.org/x/tools/cmd/gorename
   go get -u -v golang.org/x/tools/cmd/guru
-  go get -u -v golang.org/x/tools/cmd/gopls
+  GO111MODULE=on go get -u -v golang.org/x/tools/cmd/gopls
   go get -u -v golang.org/x/lint/golint
   go get -u -v github.com/josharian/impl
   go get -u -v honnef.co/go/tools/cmd/keyify
@@ -201,15 +168,6 @@ if [ ! -d "$(go env GOPATH)" ]; then
   go get -u -v github.com/fatih/hclfmt
 
   cp -r $(go env GOPATH)/bin/* /usr/local/bin/
-fi
-
-if [ ! -d "${HOME}/.fzf" ]; then
-  echo " ==> Installing fzf"
-  git clone https://github.com/junegunn/fzf "${HOME}/.fzf"
-  pushd "${HOME}/.fzf"
-  git remote set-url origin git@github.com:junegunn/fzf.git 
-  ${HOME}/.fzf/install --bin --64 --no-bash --no-zsh --no-fish
-  popd
 fi
 
 if [ ! -d "${HOME}/.zsh" ]; then
@@ -227,20 +185,28 @@ if [ ! -d "${HOME}/.tmux/plugins" ]; then
 fi
 
 echo "==> Setting shell to zsh..."
-chsh -s /usr/bin/zsh
+sudo chsh -s /usr/bin/zsh
 
 echo "==> Creating dev directories"
-mkdir -p /root/code
+mkdir -p ~/code
 
-if [ ! -d /root/code/dotfiles ]; then
+
+
+if ! [ -x "$(command -v nvm)" ]; then
+ echo "===> Installing nvm"
+ curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.37.0/install.sh | bash
+ nvm install v14.15.0
+fi
+
+if [ ! -d ~/code/dotfiles ]; then
   echo "==> Setting up dotfiles"
   # the reason we dont't copy the files individually is, to easily push changes
   # if needed
-  cd "/root/code"
-  git clone --recursive https://github.com/fatih/dotfiles.git
+  cd "~/code"
+  git clone --recursive https://github.com/pandocreek/dotfiles.git
 
-  cd "/root/code/dotfiles"
-  git remote set-url origin git@github.com:fatih/dotfiles.git
+  cd "~/code/dotfiles"
+  git remote set-url origin git@github.com:pandocreek/dotfiles.git
 
   ln -sfn $(pwd)/vimrc "${HOME}/.vimrc"
   ln -sfn $(pwd)/zshrc "${HOME}/.zshrc"
